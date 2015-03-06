@@ -342,12 +342,27 @@ sub cmd_update {
     $env->snapshot->load;
 
     my @modules;
-    for my $module (@args) {
-        my $dist = $env->snapshot->find_or_core($module)
-            or $self->error("Could not find module $module.\n");
-        next if $dist->is_core;
-        push @modules, "$module~" . $env->cpanfile->requirements_for_module($module);
-    }
+    
+    #-- Recursively build the list of modules to be updated.
+    my $build_recursive_module_list;
+    $build_recursive_module_list = sub {
+        my $depsHash = shift;
+        my @deps = @$depsHash;
+        #-- Filter out Perl.
+        @deps = grep { $_ ne 'perl' } @deps;
+        for my $module (@deps) {
+            my $dist = $env->snapshot->find_or_core($module)
+                or $self->error("Could not find module $module.\n");
+            next if $dist->is_core;
+            #-- Handle dependencies.
+            my @_deps = $dist->required_modules;
+            &$build_recursive_module_list(\@_deps);
+            #-- Version requirement.
+            my $req = $env->cpanfile->requirements_for_module($module);
+            push @modules, $req ? "$module~" . $req : $module;
+        }
+    };
+    &$build_recursive_module_list(\@args);
 
     my $builder = Carton::Builder->new(
         mirror => $self->mirror,
