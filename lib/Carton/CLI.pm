@@ -335,40 +335,42 @@ sub cmd_update {
     my $env = Carton::Environment->build;
     $env->cpanfile->load;
 
-
     my $cpanfile = Module::CPANfile->load($env->cpanfile);
     @args = grep { $_ ne 'perl' } $env->cpanfile->required_modules unless @args;
 
     $env->snapshot->load;
 
-    my @modules;
+    my %modules;
+    my %modules_visited;
+    my $traverse_deps;
     
-    #-- Recursively build the list of modules to be updated.
-    my $build_recursive_module_list;
-    $build_recursive_module_list = sub {
-        my $depsHash = shift;
-        my @deps = @$depsHash;
-        #-- Filter out Perl.
-        @deps = grep { $_ ne 'perl' } @deps;
-        for my $module (@deps) {
-            my $dist = $env->snapshot->find_or_core($module)
-                or $self->error("Could not find module $module.\n");
-            next if $dist->is_core;
-            #-- Handle dependencies.
-            my @_deps = $dist->required_modules;
-            &$build_recursive_module_list(\@_deps);
-            #-- Version requirement.
-            my $req = $env->cpanfile->requirements_for_module($module);
-            push @modules, $req ? "$module~" . $req : $module;
+    $traverse_deps = sub {
+        my ($module, $trail_ref) = @_;
+        $trail_ref ||= [];
+        my @trail = @$trail_ref;
+        return if ($module eq 'perl');
+        if (grep { $module eq $_ } @trail) {
+          print STDERR '[warning] Circular dependency cycle spotted: ';
+          push @trail, $module;
+          print STDERR join(' > ', @trail) . "\n";
+          return;
         }
+        return if ($modules_visited{$module}); $modules_visited{$module} = 1;
+        my $dist = $env->snapshot->find_or_core($module) or $self->error("Could not find module $module.\n");
+        return if $dist->is_core;
+        push @trail, $module;
+        &$traverse_deps($_, \@trail) for $dist->required_modules;
+        my $version = $env->cpanfile->requirements_for_module($module);
+        $modules{$version ? "$module~" . $version : $module} = 1;
     };
-    &$build_recursive_module_list(\@args);
+
+    &$traverse_deps($_) for @args;
 
     my $builder = Carton::Builder->new(
         mirror => $self->mirror,
         cpanfile => $env->cpanfile,
     );
-    $builder->update($env->install_path, @modules);
+    $builder->update($env->install_path, keys(%modules));
 
     $env->snapshot->find_installs($env->install_path, $env->cpanfile->requirements);
     $env->snapshot->save;
