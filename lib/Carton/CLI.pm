@@ -331,6 +331,11 @@ sub cmd_check {
 
 sub cmd_update {
     my($self, @args) = @_;
+    
+    $self->parse_options(
+        \@args,
+        "recursedeps!" => \my $recurseDeps,
+    );
 
     my $env = Carton::Environment->build;
     $env->cpanfile->load;
@@ -340,37 +345,48 @@ sub cmd_update {
 
     $env->snapshot->load;
 
-    my %modules;
-    my %modules_visited;
-    my $traverse_deps;
+    my @modules;
     
-    $traverse_deps = sub {
-        my ($module, $trail_ref) = @_;
-        $trail_ref ||= [];
-        my @trail = @$trail_ref;
-        return if ($module eq 'perl');
-        if (grep { $module eq $_ } @trail) {
-          print STDERR '[warning] Circular dependency cycle spotted: ';
-          push @trail, $module;
-          print STDERR join(' > ', @trail) . "\n";
-          return;
+    if (!$recurseDeps) {
+        for my $module (@args) {
+            my $dist = $env->snapshot->find_or_core($module)
+                or $self->error("Could not find module $module.\n");
+            next if $dist->is_core;
+            push @modules, "$module~" . $env->cpanfile->requirements_for_module($module);
         }
-        return if ($modules_visited{$module}); $modules_visited{$module} = 1;
-        my $dist = $env->snapshot->find_or_core($module) or $self->error("Could not find module $module.\n");
-        return if $dist->is_core;
-        push @trail, $module;
-        &$traverse_deps($_, \@trail) for $dist->required_modules;
-        my $version = $env->cpanfile->requirements_for_module($module);
-        $modules{$version ? "$module~" . $version : $module} = 1;
-    };
-
-    &$traverse_deps($_) for @args;
+    }
+    else {
+        my %modules;
+        my %modules_visited;
+        my $traverse_deps;
+        $traverse_deps = sub {
+            my ($module, $trail_ref) = @_;
+            $trail_ref ||= [];
+            my @trail = @$trail_ref;
+            return if ($module eq 'perl');
+            if (grep { $module eq $_ } @trail) {
+              print STDERR '[warning] Circular dependency cycle spotted: ';
+              push @trail, $module;
+              print STDERR join(' > ', @trail) . "\n";
+              return;
+            }
+            return if ($modules_visited{$module}); $modules_visited{$module} = 1;
+            my $dist = $env->snapshot->find_or_core($module) or $self->error("Could not find module $module.\n");
+            return if $dist->is_core;
+            push @trail, $module;
+            &$traverse_deps($_, \@trail) for $dist->required_modules;
+            my $version = $env->cpanfile->requirements_for_module($module);
+            $modules{$version ? "$module~" . $version : $module} = 1;
+        };
+        &$traverse_deps($_) for @args;
+        @modules = keys(%modules);
+    }
 
     my $builder = Carton::Builder->new(
         mirror => $self->mirror,
         cpanfile => $env->cpanfile,
     );
-    $builder->update($env->install_path, keys(%modules));
+    $builder->update($env->install_path, @modules);
 
     $env->snapshot->find_installs($env->install_path, $env->cpanfile->requirements);
     $env->snapshot->save;
