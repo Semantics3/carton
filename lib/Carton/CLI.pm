@@ -371,10 +371,16 @@ sub cmd_update {
               return;
             }
             return if ($modules_visited{$module}); $modules_visited{$module} = 1;
-            my $dist = $env->snapshot->find_or_core($module) or $self->error("Could not find module $module.\n");
-            return if $dist->is_core;
-            push @trail, $module;
-            &$traverse_deps($_, \@trail) for $dist->required_modules;
+            my $dist = $env->snapshot->find_or_core($module);
+            #-- or $self->error("Could not find module $module.\n");
+            if ($dist) {
+                return if $dist->is_core;
+                push @trail, $module;
+                &$traverse_deps($_, \@trail) for $dist->required_modules;
+            }
+            else {
+                print STDERR "Could not find module $module.\n";
+            }
             my $version = $env->cpanfile->requirements_for_module($module);
             $modules{$version ? "$module~" . $version : $module} = 1;
         };
