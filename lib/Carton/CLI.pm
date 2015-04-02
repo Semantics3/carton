@@ -366,8 +366,8 @@ sub cmd_update {
                 push @modules, "$module~" . $merged_reqs->requirements_for_module($module);
             }
             else {
-                $self->print("$module not found in cpanfile.snapshot." .
-                    'Ignoring as it could be related to a possible bug in carton...');
+                $self->print("$module not found in cpanfile.snapshot. " .
+                    'Ignoring as it could be related to a possible bug in carton...' . "\n");
             }
         }
     }
