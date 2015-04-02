@@ -335,6 +335,7 @@ sub cmd_update {
     $self->parse_options(
         \@args,
         "recursedeps!" => \my $recurseDeps,
+        "sem3only!" => \my $sem3Only
     );
 
     my $env = Carton::Environment->build;
@@ -356,36 +357,19 @@ sub cmd_update {
         }
     }
     else {
-        my %modules;
-        my %modules_visited;
-        my $traverse_deps;
-        $traverse_deps = sub {
-            my ($module, $trail_ref) = @_;
-            $trail_ref ||= [];
-            my @trail = @$trail_ref;
-            return if ($module eq 'perl');
-            if (grep { $module eq $_ } @trail) {
-              print STDERR '[warning] Circular dependency cycle spotted: ';
-              push @trail, $module;
-              print STDERR join(' > ', @trail) . "\n";
-              return;
-            }
-            return if ($modules_visited{$module}); $modules_visited{$module} = 1;
+        my $merged_reqs = $env->tree->merged_requirements;
+        for my $module ($merged_reqs->required_modules) {
             my $dist = $env->snapshot->find_or_core($module);
-            #-- or $self->error("Could not find module $module.\n");
             if ($dist) {
-                return if $dist->is_core;
-                push @trail, $module;
-                &$traverse_deps($_, \@trail) for $dist->required_modules;
+                next if $dist->is_core;
+                next if ($sem3Only && $module !~ /^Sem3/);
+                push @modules, "$module~" . $merged_reqs->requirements_for_module($module);
             }
             else {
-                print STDERR "Could not find module $module.\n";
+                $self->print("$module not found in cpanfile.snapshot." .
+                    'Ignoring as it could be related to a possible bug in carton...');
             }
-            my $version = $env->cpanfile->requirements_for_module($module);
-            $modules{$version ? "$module~" . $version : $module} = 1;
-        };
-        &$traverse_deps($_) for @args;
-        @modules = keys(%modules);
+        }
     }
 
     my $builder = Carton::Builder->new(
