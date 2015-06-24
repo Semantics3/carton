@@ -362,7 +362,7 @@ sub cmd_update {
             my $dist = $env->snapshot->find_or_core($module);
             if ($dist) {
                 next if $dist->is_core;
-                next if ($sem3Only && $module !~ /^Sem3/);
+                next if ($sem3Only && $module !~ /^(Sem3|Hitsio)/);
                 push @modules, "$module~" . $merged_reqs->requirements_for_module($module);
             }
             else {
