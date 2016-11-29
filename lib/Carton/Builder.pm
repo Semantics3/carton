@@ -27,6 +27,15 @@ sub custom_mirror {
     ! $self->mirror->is_default;
 }
 
+sub mirror_only {
+    my $self = shift;
+    my $mirrorOnly = 1;
+    if (defined($ENV{PERL_CARTON_MIRROR_ONLY})) {
+        $mirrorOnly = $ENV{PERL_CARTON_MIRROR_ONLY};
+    }
+    return $self->custom_mirror && $mirrorOnly;
+}
+
 sub bundle {
     my($self, $path, $cache_path, $snapshot) = @_;
 
@@ -52,7 +61,7 @@ sub install {
         (map { ("--mirror", $_->url) } $self->effective_mirrors),
         ( $self->index ? ("--mirror-index", $self->index) : () ),
         ( $self->cascade ? "--cascade-search" : () ),
-        ( $self->custom_mirror ? "--mirror-only" : () ),
+        ( $self->mirror_only ? "--mirror-only" : () ),
         "--save-dists", "$path/cache",
         $self->groups,
         "--cpanfile", $self->cpanfile,
@@ -80,7 +89,7 @@ sub update {
     $self->run_cpanm(
         "-L", $path,
         (map { ("--mirror", $_->url) } $self->effective_mirrors),
-        ( $self->custom_mirror ? "--mirror-only" : () ),
+        ( $self->mirror_only ? "--mirror-only" : () ),
         "--save-dists", "$path/cache",
         @modules
     ) or die "Updating modules failed\n";

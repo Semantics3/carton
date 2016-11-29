@@ -139,7 +139,7 @@ sub cmd_help {
 
 sub cmd_version {
     my $self = shift;
-    $self->print("carton $Carton::VERSION\n");
+    $self->print("carton $Carton::VERSION (semantics3)\n");
 }
 
 sub cmd_bundle {
@@ -328,7 +328,7 @@ sub cmd_check {
 
 sub cmd_update {
     my($self, @args) = @_;
-    
+
     $self->parse_options(
         \@args,
         "recursedeps!" => \my $recurseDeps,
@@ -344,7 +344,7 @@ sub cmd_update {
     $env->snapshot->load;
 
     my @modules;
-    
+
     if (!$recurseDeps) {
         for my $module (@args) {
             my $dist = $env->snapshot->find_or_core($module)
