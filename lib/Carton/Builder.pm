@@ -61,7 +61,7 @@ sub install {
         (map { ("--mirror", $_->url) } $self->effective_mirrors),
         ( $self->index ? ("--mirror-index", $self->index) : () ),
         ( $self->cascade ? "--cascade-search" : () ),
-        ( $self->mirror_only ? "--mirror-only" : () ),
+        ( $self->custom_mirror ? "--mirror-only" : () ),
         "--save-dists", "$path/cache",
         $self->groups,
         "--cpanfile", $self->cpanfile,
@@ -89,7 +89,8 @@ sub update {
     $self->run_cpanm(
         "-L", $path,
         (map { ("--mirror", $_->url) } $self->effective_mirrors),
-        ( $self->mirror_only ? "--mirror-only" : () ),
+        ( $self->cascade ? "--cascade-search" : () ),
+        ( $self->custom_mirror ? "--mirror-only" : () ),
         "--save-dists", "$path/cache",
         @modules
     ) or die "Updating modules failed\n";
