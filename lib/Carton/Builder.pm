@@ -61,7 +61,7 @@ sub install {
         (map { ("--mirror", $_->url) } $self->effective_mirrors),
         ( $self->index ? ("--mirror-index", $self->index) : () ),
         ( $self->cascade ? "--cascade-search" : () ),
-        ( $self->custom_mirror ? "--mirror-only" : () ),
+        ( $self->mirror_only ? "--mirror-only" : () ),
         "--save-dists", "$path/cache",
         $self->groups,
         "--cpanfile", $self->cpanfile,
